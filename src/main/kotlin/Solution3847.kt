@@ -1,6 +1,10 @@
+import java.util.Stack
+
 class Solution3847 {
 
     fun scoreDifference(nums: IntArray): Int {
+        var stack = Stack<Int>()
+        stack.push(nums[0])
         var score1 = 0
         var score2 = 0
         var currentPlayer = true
