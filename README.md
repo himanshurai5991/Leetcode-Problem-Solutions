@@ -1,2 +1,3 @@
-# SDE-1-Practice-For-30-Days
-30 days for SDE Preparation
+# Solutions to the Leetcode problems
+
+Check the Class number that is the problem number of the leetcode.
