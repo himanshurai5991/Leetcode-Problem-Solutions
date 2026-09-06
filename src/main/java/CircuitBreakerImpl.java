@@ -8,27 +8,39 @@
 //        - If it fails, open the circuit again.
 
 
+import java.time.Clock;
 import java.util.ArrayDeque;
 import java.util.Deque;
+import java.util.concurrent.atomic.AtomicReference;
 
 enum STATE {
     OPEN,
     CLOSED,
-    HALF_OPEN,
-    HALF_CLOSED
+    HALF_OPEN
 
 }
 
 public class CircuitBreakerImpl {
 
     private final Deque<Long> failureTimeStamp = new ArrayDeque<>();
-    STATE state = STATE.CLOSED;
+    //private STATE state = STATE.CLOSED;
+    private boolean trialInProgress;
+    private final Clock clock;
+
+    private final AtomicReference<STATE> state =
+            new AtomicReference<>(STATE.CLOSED);
 
 
-    long windowMillis;       // X minutes
-    int failureThreshold;    // Y failures
-    long cooldownMillis;     // Z minutes
+    private final long windowMillis;       // X minutes
+    private final int failureThreshold;    // Y failures
+    private final long cooldownMillis;  // Z minutes
 
+    CircuitBreakerImpl(long windowMillis, int failureThreshold, long cooldownMillis, Clock clock) {
+        this.windowMillis = windowMillis;
+        this.failureThreshold = failureThreshold;
+        this.cooldownMillis = cooldownMillis;
+        this.clock = clock;
+    }
     long openedAt;
 
     void removeOldFailures(long now) {
@@ -38,41 +50,61 @@ public class CircuitBreakerImpl {
     }
 
     synchronized void recordFailure() {
-        long now = System.currentTimeMillis();
+        long now = clock.millis();
+
+        if(state.get() == STATE.HALF_OPEN) {
+            state.set(STATE.OPEN);
+            trialInProgress = false;
+            openedAt = now;
+            return;
+        }
+
         removeOldFailures(now);
         failureTimeStamp.addLast(now);
 
 
         if (failureTimeStamp.size() >= failureThreshold) {
-            state = STATE.OPEN;
+            state.set(STATE.OPEN);
             openedAt = now;
         }
     }
 
-    boolean isOpen() {
-        return state == STATE.OPEN;
-    }
-    boolean isClosed() {
-        return state == STATE.CLOSED;
+    synchronized void recordSuccess() {
+        if (state.get() == STATE.HALF_OPEN) {
+            state.set(STATE.CLOSED);
+            failureTimeStamp.clear();
+            trialInProgress = false;
+        }
+
     }
 
-    synchronized boolean allowRequest() {
-        long now = System.currentTimeMillis();
+    boolean allowRequest() {
+        long now = clock.millis();
 
-        if(state == STATE.CLOSED) {
+        if(state.get() == STATE.CLOSED) {
             removeOldFailures(now);
             return true;
         }
 
 
-        if(state == STATE.OPEN) {
+        if(state.get() == STATE.OPEN) {
             if (now - openedAt >= cooldownMillis) {
-                state = STATE.HALF_OPEN;
+                state.compareAndSet(STATE.OPEN, STATE.HALF_OPEN);
+                trialInProgress = true;
                 return true;
             } else {
                 return false;
             }
         }
+
+        if(state.get() == STATE.HALF_OPEN) {
+            if(trialInProgress) {
+                return false;
+            }
+            trialInProgress = true;
+            return true;
+        }
+
         return true;
     }
 
