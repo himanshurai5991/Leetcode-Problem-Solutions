@@ -1,0 +1,28 @@
+# Gradle
+.gradle/
+build/
+gradle-app.setting
+!gradle-wrapper.jar
+!gradle-wrapper.properties
+
+# IDE
+.idea/
+*.iml
+*.iws
+*.ipr
+out/
+
+# macOS
+.DS_Store
+
+# Kotlin/Java
+*.class
+*.jar
+*.zip
+*.tar
+*.tar.gz
+
+# Build outputs
+bin/
+dist/
+
